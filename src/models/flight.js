@@ -1,5 +1,7 @@
 "use strict";
 const { Model } = require("sequelize");
+const AppError = require("../utils/errors/app-error");
+const { StatusCodes } = require("http-status-codes");
 module.exports = (sequelize, DataTypes) => {
     class Flight extends Model {
         /**
@@ -13,10 +15,10 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: "airplaneId",
             });
             this.belongsTo(models.Airport, {
-                foreignKey: "departureAirportId",
+                foreignKey: "departureAirportCode",
             });
             this.belongsTo(models.Airport, {
-                foreignKey: "arrivalAirportId",
+                foreignKey: "arrivalAirportCode",
             });
         }
     }
@@ -30,11 +32,11 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
-            departureAirportId: {
+            departureAirportCode: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
-            arrivalAirportId: {
+            arrivalAirportCode: {
                 type: DataTypes.STRING,
                 allowNull: false,
             },
@@ -53,7 +55,7 @@ module.exports = (sequelize, DataTypes) => {
             boardingGate: {
                 type: DataTypes.STRING,
             },
-            totalSeats: {
+            totalSeatsAvailable: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
             },
@@ -61,6 +63,28 @@ module.exports = (sequelize, DataTypes) => {
         {
             sequelize,
             modelName: "Flight",
+            hooks: {
+                beforeValidate: async (flight, options) => {
+                    console.log("inside beforeValidate");
+                    if (!flight.totalSeatsAvailable) {
+                        console.log(
+                            "totalSeatsAvailable not send in req.body "
+                        );
+                        try {
+                            const airplane =
+                                await sequelize.models.Airplane.findByPk(
+                                    flight.airplaneId
+                                );
+                            flight.totalSeatsAvailable = airplane.capacity;
+                        } catch (error) {
+                            throw new AppError(
+                                "Airplane Not found with this ID",
+                                StatusCodes.BAD_REQUEST
+                            );
+                        }
+                    }
+                },
+            },
         }
     );
     return Flight;
